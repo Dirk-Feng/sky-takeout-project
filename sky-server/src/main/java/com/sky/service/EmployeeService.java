@@ -2,6 +2,7 @@ package com.sky.service;
 
 import com.sky.dto.EmployeeDTO;
 import com.sky.dto.EmployeeLoginDTO;
+import com.sky.dto.EmployeeEditPasswordDTO;
 import com.sky.dto.EmployeePageQueryDTO;
 import com.sky.result.PageResult;
 import com.sky.vo.EmployeeVO;
@@ -18,6 +19,14 @@ public interface EmployeeService {
     Employee login(EmployeeLoginDTO employeeLoginDTO);
 
     void save(EmployeeDTO employeeDTO);
+
+    void update(EmployeeDTO employeeDTO);
+
+    void editPassword(EmployeeEditPasswordDTO dto);
+
+    void startOrStop(Integer status, Long id);
+
+    EmployeeVO getById(Long id);
 
     PageResult<EmployeeVO> pageQuery(EmployeePageQueryDTO query);
 }
