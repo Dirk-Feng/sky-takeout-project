@@ -19,7 +19,8 @@
     </modules>
     <properties>
         <mybatis.spring>2.2.0</mybatis.spring>
-        <lombok>1.18.20</lombok>
+        <!-- 1.18.20 在当前 JDK 25 下无法正确处理注解；使用支持新 JDK 的版本。 -->
+        <lombok>1.18.42</lombok>
         <fastjson>1.2.76</fastjson>
         <commons.lang>2.6</commons.lang>
         <druid>1.2.1</druid>

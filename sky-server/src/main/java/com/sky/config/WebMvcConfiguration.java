@@ -17,6 +17,10 @@ import springfox.documentation.spring.web.plugins.Docket;
 
 /**
  * 配置类，注册web层相关组件
+ * 不是一个处理业务的controller
+ * 配置拦截器要拦截什么
+ * 告诉swagger要生成什么
+ * 两者属于spring MVC启动时候的配置 所以放到一起
  */
 @Configuration
 @Slf4j
@@ -27,7 +31,7 @@ public class WebMvcConfiguration extends WebMvcConfigurationSupport {
 
     /**
      * 注册自定义拦截器
-     *
+     * protect重写
      * @param registry
      */
     protected void addInterceptors(InterceptorRegistry registry) {
