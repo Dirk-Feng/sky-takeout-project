@@ -61,8 +61,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (existing != null && !dto.getId().equals(existing.getId())) throw new BaseException("Username already exists");
         // 只设置表单字段和审计字段，不改变密码或账号状态。
         Employee employee = Employee.builder().id(dto.getId()).username(dto.getUsername()).name(dto.getName())
-                .phone(dto.getPhone()).sex(dto.getSex()).idNumber(dto.getIdNumber())
-                .updateTime(LocalDateTime.now()).updateUser(operatorId).build();
+                .phone(dto.getPhone()).sex(dto.getSex()).idNumber(dto.getIdNumber()).build();
         try {
             if (employeeMapper.update(employee) == 0) throw new BaseException("员工信息未更新，请检查后重试");
         } catch (DuplicateKeyException ex) {
@@ -96,8 +95,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (currentId == null) {
             throw new BaseException("未获取到当前登录员工");
         }
-        Employee employee = Employee.builder().id(id).status(status)
-                .updateTime(LocalDateTime.now()).updateUser(currentId).build();
+        Employee employee = Employee.builder().id(id).status(status).build();
         // 影响行数为零也可能与数据库更新计数方式有关，不能直接断定员工不存在。
         if (employeeMapper.update(employee) == 0) {
             throw new BaseException("员工状态未更新，请检查员工信息后重试");
@@ -165,10 +163,9 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (employeeMapper.getByUsername(dto.getUsername()) != null) throw new BaseException("Username already exists");
         Long id = BaseContext.getCurrentId();
         if (id == null) throw new BaseException("Missing authenticated user");
-        LocalDateTime now = LocalDateTime.now();
         Employee employee = Employee.builder().username(dto.getUsername()).name(dto.getName()).phone(dto.getPhone())
                 .sex(dto.getSex()).idNumber(dto.getIdNumber()).password(DigestUtils.md5DigestAsHex(PasswordConstant.DEFAULT_PASSWORD.getBytes()))
-                .status(StatusConstant.ENABLE).createTime(now).updateTime(now).createUser(id).updateUser(id).build();
+                .status(StatusConstant.ENABLE).build();
         try { employeeMapper.insert(employee); }
         catch (DuplicateKeyException ex) {
             if (employeeMapper.getByUsername(dto.getUsername()) != null) throw new BaseException("Username already exists");
