@@ -4,6 +4,13 @@ import com.sky.constant.MessageConstant;
 import com.sky.constant.StatusConstant;
 import com.sky.dto.EmployeeDTO;
 import com.sky.dto.EmployeeLoginDTO;
+import com.sky.dto.EmployeePageQueryDTO;
+import com.sky.result.PageResult;
+import com.sky.vo.EmployeeVO;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import java.util.List;
+import java.util.stream.Collectors;
 import com.sky.dto.EmployeeDTO;
 import com.sky.constant.PasswordConstant;
 import com.sky.context.BaseContext;
@@ -26,6 +33,23 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Autowired
     private EmployeeMapper employeeMapper;
+
+    public PageResult<EmployeeVO> pageQuery(EmployeePageQueryDTO query) {
+        if (query == null || query.getPage() < 1 || query.getPageSize() < 1 || query.getPageSize() > 10) {
+            throw new BaseException("页码须大于零，每页数量须为1至10");
+        }
+        PageHelper.startPage(query.getPage(), query.getPageSize());
+        // mapper被拦截, 右边其实是Page
+        List<Employee> employees = employeeMapper.pageQuery(query);
+        // 用PageInfo能顺带识别传入的employees是否是Page对象
+        PageInfo<Employee> pageInfo = new PageInfo<>(employees);
+        List<EmployeeVO> records = pageInfo.getList().stream().map(employee -> {
+            EmployeeVO vo = new EmployeeVO();
+            BeanUtils.copyProperties(employee, vo);
+            return vo;
+        }).collect(Collectors.toList());
+        return new PageResult<>(pageInfo.getTotal(), records);
+    }
 
     /**
      * 员工登录

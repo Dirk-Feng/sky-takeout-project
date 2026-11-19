@@ -1,12 +1,16 @@
 package com.sky.mapper;
 
 import com.sky.entity.Employee;
+import com.sky.dto.EmployeePageQueryDTO;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface EmployeeMapper {
+
+    // 后续分页查询需紧跟 PageHelper.startPage 调用，插件才会拦截该次 MyBatis 查询并分页。
 
     /**
      * 根据用户名查询员工
@@ -18,4 +22,6 @@ public interface EmployeeMapper {
 
     @Insert("insert into employee (username, name, password, phone, sex, id_number, status, create_time, update_time, create_user, update_user) values (#{username}, #{name}, #{password}, #{phone}, #{sex}, #{idNumber}, #{status}, #{createTime}, #{updateTime}, #{createUser}, #{updateUser})")
     void insert(Employee employee);
+
+    List<Employee> pageQuery(EmployeePageQueryDTO query);
 }
