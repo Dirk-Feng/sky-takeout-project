@@ -1,6 +1,15 @@
 package com.sky.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.sky.dto.DishDTO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.Set;
 import com.sky.dto.DishPageQueryDTO;
 import com.sky.vo.DishVO;
 import com.sky.result.PageResult;
@@ -26,6 +35,11 @@ import java.util.Collections;
 
 @Service
 public class DishServiceImpl implements DishService {
+    private static final Logger log = LoggerFactory.getLogger(DishServiceImpl.class);
+    private static final String CACHE_PREFIX = "dish_";
+    private static final long CACHE_TTL_MINUTES = 30;
+    @Autowired
+    private StringRedisTemplate redisTemplate;
     private final DishMapper dishMapper;
     private final DishFlavorMapper dishFlavorMapper;
     private final SetmealDishMapper setmealDishMapper;
@@ -46,6 +60,7 @@ public class DishServiceImpl implements DishService {
         return result;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void startOrStop(Integer status, Long id) {
         if (status == null || (!StatusConstant.ENABLE.equals(status) && !StatusConstant.DISABLE.equals(status))) {
             throw new BaseException("菜品状态无效");
@@ -56,6 +71,7 @@ public class DishServiceImpl implements DishService {
         // TODO：后续实现套餐管理时，需要重新评估菜品停售与套餐状态之间的业务约束。例如，菜品被正在起售的套餐引用时，是否应该禁止停售，以及套餐起售前是否需要检查其包含的菜品状态。
         dish.setStatus(status);
         if (dishMapper.update(dish) != 1) throw new BaseException("菜品状态未更新，请检查后重试");
+        evictAfterCommit(Collections.singleton(dish.getCategoryId()));
     }
 
     // 事务同时保护菜品更新和风味替换。
@@ -66,7 +82,8 @@ public class DishServiceImpl implements DishService {
                 || dto.getPrice() == null || dto.getImage() == null || dto.getImage().trim().isEmpty()) {
             throw new BaseException("菜品必填信息不完整");
         }
-        if (dishMapper.getById(dto.getId()) == null) throw new BaseException("菜品不存在");
+        Dish oldDish = dishMapper.getById(dto.getId());
+        if (oldDish == null) throw new BaseException("菜品不存在");
         Dish dish = Dish.builder().id(dto.getId()).name(dto.getName()).categoryId(dto.getCategoryId())
                 .price(dto.getPrice()).image(dto.getImage()).description(dto.getDescription()).status(dto.getStatus()).build();
         if (dishMapper.update(dish) != 1) throw new BaseException("菜品未更新，请检查后重试");
@@ -83,6 +100,7 @@ public class DishServiceImpl implements DishService {
             dishFlavorMapper.deleteByDishIds(Collections.singletonList(dto.getId()));
             if (!replacements.isEmpty()) dishFlavorMapper.insertBatch(replacements);
         }
+        evictAfterCommit(new LinkedHashSet<>(java.util.Arrays.asList(oldDish.getCategoryId(), dto.getCategoryId())));
     }
 
     // 所有检查和两张表的删除处于同一事务，任何失败都撤销已执行的删除。
@@ -105,6 +123,9 @@ public class DishServiceImpl implements DishService {
         if (dishMapper.deleteByIds(uniqueIds) != uniqueIds.size()) {
             throw new BaseException("菜品删除不完整，请重试");
         }
+        Set<Long> categories = new LinkedHashSet<>();
+        for (Dish item : dishes) categories.add(item.getCategoryId());
+        evictAfterCommit(categories);
     }
 
     public PageResult<DishVO> pageQuery(DishPageQueryDTO query) {
@@ -143,9 +164,21 @@ public class DishServiceImpl implements DishService {
             }
             dishFlavorMapper.insertBatch(flavors);
         }
+        evictAfterCommit(Collections.singleton(dto.getCategoryId()));
     }
     @Override
     public List<DishVO> listWithFlavor(Dish dish) {
+        boolean cacheable = dish != null && dish.getCategoryId() != null
+                && StatusConstant.ENABLE.equals(dish.getStatus());
+        String key = cacheable ? CACHE_PREFIX + dish.getCategoryId() : null;
+        if (cacheable) {
+            try {
+                String cached = redisTemplate.opsForValue().get(key);
+                if (cached != null) return JSON.parseArray(cached, DishVO.class);
+            } catch (RuntimeException ex) {
+                log.warn("菜品缓存读取失败，将查询数据库");
+            }
+        }
         List<DishVO> result = new ArrayList<>();
         for (Dish item : dishMapper.list(dish)) {
             DishVO vo = new DishVO();
@@ -153,5 +186,39 @@ public class DishServiceImpl implements DishService {
             vo.setFlavors(dishFlavorMapper.getByDishId(item.getId()));
             result.add(vo);
         }
+        if (cacheable) {
+            try {
+                redisTemplate.opsForValue().set(key, JSON.toJSONString(result), CACHE_TTL_MINUTES, TimeUnit.MINUTES);
+            } catch (RuntimeException ex) {
+                log.warn("菜品缓存写入失败");
+            }
+        }
         return result;
+    }
+
+    private void evictAfterCommit(Set<Long> categoryIds) {
+        Set<Long> ids = new LinkedHashSet<>(categoryIds);
+        ids.remove(null);
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            evict(ids);
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException("菜品缓存清理需要事务同步");
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                evict(ids);
+            }
+        });
+    }
+    private void evict(Set<Long> ids) {
+        for (Long id : ids) {
+            try {
+                redisTemplate.delete(CACHE_PREFIX + id);
+            } catch (RuntimeException ex) {
+                log.warn("菜品缓存清理失败，将依靠过期时间恢复");
+            }
+        }
     }}
