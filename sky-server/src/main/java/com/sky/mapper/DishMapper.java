@@ -15,6 +15,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface DishMapper {
 
+    List<Dish> list(Dish dish);
     List<DishVO> pageQuery(DishPageQueryDTO query);
     @Select("select id, name, category_id, price, image, description, status, update_time from dish where id = #{id}")
     Dish getById(Long id);
