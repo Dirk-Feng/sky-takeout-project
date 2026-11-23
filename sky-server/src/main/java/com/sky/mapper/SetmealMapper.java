@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface SetmealMapper {
+    @Select("select id, name, image, price from setmeal where id = #{id}")
+    Setmeal getCartProduct(Long id);
     List<Setmeal> list(Setmeal setmeal);
 
     @Select("select sd.name, sd.copies, d.image, d.description from setmeal_dish sd left join dish d on sd.dish_id = d.id where sd.setmeal_id = #{setmealId}")
