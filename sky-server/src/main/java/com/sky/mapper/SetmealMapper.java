@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface SetmealMapper {
+    @Select({"<script>select id,name,image,price,status from setmeal where id in <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
+    List<Setmeal> findOrderProducts(@org.apache.ibatis.annotations.Param("ids") List<Long> ids);
     @Select("select id, name, image, price from setmeal where id = #{id}")
     Setmeal getCartProduct(Long id);
     List<Setmeal> list(Setmeal setmeal);

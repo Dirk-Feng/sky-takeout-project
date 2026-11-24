@@ -53,3 +53,7 @@ sky:
     # TODO 当前是30天的有效token 便于swagger测试 后续改成短时
     user-ttl: 2592000000
     user-token-name: authentication
+
+order-fees:
+  delivery: 6
+  packaging-per-item: 1

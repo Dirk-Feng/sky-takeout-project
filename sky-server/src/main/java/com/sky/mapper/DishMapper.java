@@ -14,6 +14,8 @@ import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface DishMapper {
+    @Select({"<script>select id,name,image,price,status from dish where id in <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
+    List<Dish> findOrderProducts(@Param("ids") List<Long> ids);
 
     List<Dish> list(Dish dish);
     List<DishVO> pageQuery(DishPageQueryDTO query);

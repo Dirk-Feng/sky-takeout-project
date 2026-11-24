@@ -6,6 +6,10 @@ import java.util.List;
 
 @Mapper
 public interface ShoppingCartMapper {
+    @Select("select * from shopping_cart where user_id = #{userId} order by id for update")
+    List<ShoppingCart> listForOrder(Long userId);
+    @Delete({"<script>delete from shopping_cart where user_id = #{userId} and id in <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
+    int deleteOrderItems(@Param("userId") Long userId, @Param("ids") List<Long> ids);
     @Update("update shopping_cart set number = number + 1 where user_id = #{userId} and dish_id <=> #{dishId} and setmeal_id <=> #{setmealId} and dish_flavor <=> #{dishFlavor}")
     int increment(ShoppingCart item);
     @Update("update shopping_cart set number = number - 1 where user_id = #{userId} and dish_id <=> #{dishId} and setmeal_id <=> #{setmealId} and dish_flavor <=> #{dishFlavor} and number > 1")
