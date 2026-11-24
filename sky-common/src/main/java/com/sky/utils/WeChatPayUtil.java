@@ -67,8 +67,7 @@ public class WeChatPayUtil {
             CloseableHttpClient httpClient = builder.build();
             return httpClient;
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return null;
+            throw new IllegalStateException("微信支付证书加载失败");
         }
     }
 
@@ -140,7 +139,7 @@ public class WeChatPayUtil {
         jsonObject.put("notify_url", weChatProperties.getNotifyUrl());
 
         JSONObject amount = new JSONObject();
-        amount.put("total", total.multiply(new BigDecimal(100)).setScale(2, BigDecimal.ROUND_HALF_UP).intValue());
+        amount.put("total", total.movePointRight(2).intValueExact());
         amount.put("currency", "CNY");
 
         jsonObject.put("amount", amount);
@@ -168,7 +167,7 @@ public class WeChatPayUtil {
         String bodyAsString = jsapi(orderNum, total, description, openid);
         //解析返回结果
         JSONObject jsonObject = JSON.parseObject(bodyAsString);
-        System.out.println(jsonObject);
+
 
         String prepayId = jsonObject.getString("prepay_id");
         if (prepayId != null) {
@@ -185,7 +184,7 @@ public class WeChatPayUtil {
                 stringBuilder.append(o).append("\n");
             }
             String signMessage = stringBuilder.toString();
-            byte[] message = signMessage.getBytes();
+            byte[] message = signMessage.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
             Signature signature = Signature.getInstance("SHA256withRSA");
             signature.initSign(PemUtil.loadPrivateKey(new FileInputStream(new File(weChatProperties.getPrivateKeyFilePath()))));
@@ -220,8 +219,8 @@ public class WeChatPayUtil {
         jsonObject.put("out_refund_no", outRefundNo);
 
         JSONObject amount = new JSONObject();
-        amount.put("refund", refund.multiply(new BigDecimal(100)).setScale(2, BigDecimal.ROUND_HALF_UP).intValue());
-        amount.put("total", total.multiply(new BigDecimal(100)).setScale(2, BigDecimal.ROUND_HALF_UP).intValue());
+        amount.put("refund", refund.movePointRight(2).intValueExact());
+        amount.put("total", total.movePointRight(2).intValueExact());
         amount.put("currency", "CNY");
 
         jsonObject.put("amount", amount);
