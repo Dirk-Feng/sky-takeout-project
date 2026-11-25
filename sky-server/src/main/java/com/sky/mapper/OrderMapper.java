@@ -3,6 +3,7 @@ import com.sky.entity.Orders;
 import com.sky.dto.GoodsSalesDTO;
 import com.sky.vo.DailyOrderCountVO;
 import com.sky.vo.DailyTurnoverVO;
+import com.sky.vo.OrderOverViewVO;
 import org.apache.ibatis.annotations.*;
 
 import java.time.LocalDateTime;
@@ -10,6 +11,10 @@ import java.util.List;
 
 @Mapper
 public interface OrderMapper {
+    @Select("select count(*) as allOrders, coalesce(sum(case when status = #{waiting} then 1 else 0 end), 0) as waitingOrders, coalesce(sum(case when status = #{delivered} then 1 else 0 end), 0) as deliveredOrders, coalesce(sum(case when status = #{completed} then 1 else 0 end), 0) as completedOrders, coalesce(sum(case when status = #{cancelled} then 1 else 0 end), 0) as cancelledOrders from orders where order_time > #{beginTime}")
+    OrderOverViewVO getWorkspaceOrderOverview(@Param("beginTime") LocalDateTime beginTime,
+            @Param("waiting") Integer waiting, @Param("delivered") Integer delivered,
+            @Param("completed") Integer completed, @Param("cancelled") Integer cancelled);
     List<GoodsSalesDTO> getSalesTop10(@Param("beginTime") LocalDateTime beginTime,
                                       @Param("endTimeExclusive") LocalDateTime endTimeExclusive,
                                       @Param("completedStatus") Integer completedStatus);

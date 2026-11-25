@@ -2,21 +2,28 @@ package com.sky.service.impl;
 
 import com.sky.entity.Orders;
 import com.sky.dto.GoodsSalesDTO;
-import com.sky.vo.SalesTop10ReportVO;
+import com.sky.service.WorkspaceService;
+import com.sky.vo.*;
 import com.sky.exception.BaseException;
 import com.sky.mapper.OrderMapper;
 import com.sky.mapper.UserMapper;
-import com.sky.vo.DailyUserCountVO;
-import com.sky.vo.DailyOrderCountVO;
-import com.sky.vo.OrderReportVO;
-import com.sky.vo.UserReportVO;
 import com.sky.service.ReportService;
-import com.sky.vo.DailyTurnoverVO;
-import com.sky.vo.TurnoverReportVO;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.springframework.stereotype.Service;
+
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,7 +33,11 @@ import java.util.Map;
 public class ReportServiceImpl implements ReportService {
     private final OrderMapper orderMapper;
     private final UserMapper userMapper;
-    public ReportServiceImpl(OrderMapper orderMapper, UserMapper userMapper) { this.orderMapper = orderMapper; this.userMapper = userMapper; }
+    private final WorkspaceService workspaceService;
+
+    public ReportServiceImpl(OrderMapper orderMapper, UserMapper userMapper, WorkspaceService workspaceService) { this.orderMapper = orderMapper; this.userMapper = userMapper;
+        this.workspaceService = workspaceService;
+    }
 
     public TurnoverReportVO getTurnoverStatistics(LocalDate begin, LocalDate end) {
         if (begin == null || end == null || begin.isAfter(end)) throw new BaseException("统计日期范围无效");
@@ -94,4 +105,48 @@ public class ReportServiceImpl implements ReportService {
         }
         return SalesTop10ReportVO.builder().nameList(StringUtils.join(names, ","))
                 .numberList(StringUtils.join(numbers, ",")).build();
-    }}
+    }
+
+    public void exportBusinessData(HttpServletResponse response) {
+        LocalDate today = LocalDate.now();
+        LocalDate begin = today.minusDays(30);
+        LocalDate end = today.minusDays(1);
+        BusinessDataVO totals = workspaceService.getBusinessData(begin.atStartOfDay(), today.atStartOfDay());
+        InputStream resource = getClass().getClassLoader().getResourceAsStream("template/运营数据报表模板.xlsx");
+        if (resource == null) throw new IllegalStateException("运营数据报表模板不存在");
+        try (InputStream in = resource; XSSFWorkbook excel = new XSSFWorkbook(in)) {
+            Sheet sheet = excel.getSheet("Sheet1");
+            if (sheet == null) throw new IllegalStateException("运营数据报表模板缺少Sheet1");
+            sheet.getRow(1).getCell(1).setCellValue("时间：" + begin + "至" + end);
+            Row row = sheet.getRow(3);
+            row.getCell(2).setCellValue(number(totals.getTurnover()));
+            row.getCell(4).setCellValue(number(totals.getOrderCompletionRate()));
+            row.getCell(6).setCellValue(number(totals.getNewUsers()));
+            row = sheet.getRow(4);
+            row.getCell(2).setCellValue(number(totals.getValidOrderCount()));
+            row.getCell(4).setCellValue(number(totals.getUnitPrice()));
+            for (int i = 0; i < 30; i++) {
+                LocalDate date = begin.plusDays(i);
+                BusinessDataVO daily = workspaceService.getBusinessData(date.atStartOfDay(), date.plusDays(1).atStartOfDay());
+                row = sheet.getRow(7 + i);
+                row.getCell(1).setCellValue(date.toString());
+                row.getCell(2).setCellValue(number(daily.getTurnover()));
+                row.getCell(3).setCellValue(number(daily.getValidOrderCount()));
+                row.getCell(4).setCellValue(number(daily.getOrderCompletionRate()));
+                row.getCell(5).setCellValue(number(daily.getUnitPrice()));
+                row.getCell(6).setCellValue(number(daily.getNewUsers()));
+            }
+            String filename = URLEncoder.encode("运营数据报表.xlsx", StandardCharsets.UTF_8.name()).replace("+", "%20");
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition", "attachment; filename=\"report.xlsx\"; filename*=UTF-8''" + filename);
+            ServletOutputStream out = response.getOutputStream();
+            excel.write(out);
+            out.flush();
+        } catch (IOException e) {
+            throw new IllegalStateException("导出运营数据报表失败", e);
+        }
+    }
+
+    private static double number(Number value) { return value == null ? 0.0 : value.doubleValue(); }
+
+}

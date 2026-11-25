@@ -9,11 +9,15 @@ import com.sky.enumeration.OperationType;
 import com.sky.entity.Dish;
 import com.sky.dto.DishPageQueryDTO;
 import com.sky.vo.DishVO;
+import com.sky.vo.DishOverViewVO;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface DishMapper {
+
+    @Select("select coalesce(sum(case when status = #{enabled} then 1 else 0 end), 0) as sold, coalesce(sum(case when status = #{disabled} then 1 else 0 end), 0) as discontinued from dish")
+    DishOverViewVO getWorkspaceOverview(@Param("enabled") Integer enabled, @Param("disabled") Integer disabled);
     @Select({"<script>select id,name,image,price,status from dish where id in <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
     List<Dish> findOrderProducts(@Param("ids") List<Long> ids);
 
