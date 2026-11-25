@@ -19,4 +19,27 @@
     </set>
     where id = #{id} and #{id} is not null
   </update>
+  <select id="sumTurnoverByDate" resultType="com.sky.vo.DailyTurnoverVO">
+    select date(order_time) as date, sum(amount) as turnover
+    from orders
+    where order_time &gt;= #{beginTime} and order_time &lt; #{endTimeExclusive}
+      and status = #{status}
+    group by date(order_time)
+  </select>
+  <select id="countOrdersByDate" resultType="com.sky.vo.DailyOrderCountVO">
+    select date(order_time) as date, count(*) as totalOrders,
+           sum(case when status = #{completedStatus} then 1 else 0 end) as validOrders
+    from orders
+    where order_time &gt;= #{beginTime} and order_time &lt; #{endTimeExclusive}
+    group by date(order_time) order by date(order_time)
+  </select>
+  <select id="getSalesTop10" resultType="com.sky.dto.GoodsSalesDTO">
+    select od.name, sum(od.number) as number
+    from order_detail od inner join orders o on od.order_id = o.id
+    where o.order_time &gt;= #{beginTime} and o.order_time &lt; #{endTimeExclusive}
+      and o.status = #{completedStatus}
+    group by od.name
+    order by number desc, od.name asc
+    limit 10
+  </select>
 </mapper>
